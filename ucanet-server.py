@@ -10,10 +10,14 @@ import datetime
 import requests
 import threading
 import traceback
-import http.server
+#import http.server
 import socketserver
+import configparser
 from dnslib import *
 from ucanetlib import *
+
+ucaconf = configparse.ConfigParser()
+# finish up the rest, apply below
 
 SERVER_IP = '127.0.0.1' # Change to your local IP Address.
 SERVER_PORT = 53
