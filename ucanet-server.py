@@ -19,12 +19,12 @@ ucaconf = configparse.ConfigParser()
 ucaconf.read('ucanet.ini')
 
 if ucaconf.get('WEB','LOCAL') == 'yes':
-		import http.server
-		NEOCITIES_PORT = ucaconf.get('WEB', 'PORT')
+	import http.server
+	NEOCITIES_PORT = ucaconf.get('WEB', 'PORT')
 
-SERVER_IP = ucaconf.get('DNS', 'LISTEN') #'127.0.0.1' Change to your local IP Address.
-SERVER_PORT = ucaconf.get('DNS', 'PORT') #53
-NEOCITIES_IP = ucaconf.get('WEB', 'HOST') #'135.148.41.26'  Change this to the IP that serves Neocities sites
+SERVER_IP = ucaconf.get('DNS', 'LISTEN')
+SERVER_PORT = ucaconf.get('DNS', 'PORT')
+NEOCITIES_IP = ucaconf.get('WEB', 'HOST')
 
 def log_request(handler_object):
 	current_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
