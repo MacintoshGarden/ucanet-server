@@ -15,32 +15,32 @@ import configparser
 from dnslib import *
 from ucanetlib import *
 
-ucaconf = configparse.ConfigParser()
+ucaconf = configparser.ConfigParser()
 ucaconf.read('ucanet.ini')
 
 if ucaconf.get('WEB','LOCAL') == 'yes':
 	import http.server
-	NEOCITIES_PORT = ucaconf.get('WEB', 'PORT')
+	NEOCITIES_PORT = int(ucaconf.get('WEB', 'PORT'))
 
 SERVER_IP = ucaconf.get('DNS', 'LISTEN')
-SERVER_PORT = ucaconf.get('DNS', 'PORT')
+SERVER_PORT = int(ucaconf.get('DNS', 'PORT'))
 NEOCITIES_IP = ucaconf.get('WEB', 'HOST')
 
 def log_request(handler_object):
 	current_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
 	print("%s request %s (%s %s)" % (handler_object.__class__.__name__[:3], current_time, handler_object.client_address[0], handler_object.client_address[1]))
-	
+
 def dns_response(data):
 	dns_request = DNSRecord.parse(data)
-	dns_reply = DNSRecord(DNSHeader(id = dns_request.header.id, qr = 1, aa = 1, ra = 1), q = dns_request.q)	
+	dns_reply = DNSRecord(DNSHeader(id = dns_request.header.id, qr = 1, aa = 1, ra = 1), q = dns_request.q)
 	query_name = str(dns_reply.q.qname)
-	
+
 	if ip_address := find_entry(query_name[0:-1]):
 		if formatted_ip := format_ip(ip_address):
 			dns_reply.add_answer(*RR.fromZone(f'{query_name} 60 A {formatted_ip} MX {formatted_ip}'))
 		else:
 			dns_reply.add_answer(*RR.fromZone(f'{query_name} 60 A {NEOCITIES_IP}'))
-			
+
 	return dns_reply.pack()
 
 class BaseRequestHandler(socketserver.BaseRequestHandler):
@@ -52,7 +52,7 @@ class BaseRequestHandler(socketserver.BaseRequestHandler):
 
 	def handle(self):
 		log_request(self)
-		
+
 		try:
 			self.send_data(dns_response(self.get_data()))
 		except Exception:
@@ -79,54 +79,55 @@ class UDPRequestHandler(BaseRequestHandler):
 	def send_data(self, data):
 		return self.request[1].sendto(data, self.client_address)
 
-class NeoHTTPHandler(http.server.BaseHTTPRequestHandler):
-	def do_GET(self):
-		log_request(self)
-		
-		host_name = self.headers.get('Host')
-		neo_site = find_entry(host_name)
-		
-		if neo_site and not format_ip(neo_site):	
-			neo_site = "https://%s.neocities.org%s" % (neo_site, self.path)
-		else:
-			neo_site = "https://ucanet.net%s" % (self.path)
-			
-		request_response = requests.get(neo_site, stream = True, allow_redirects=False)
+if ucaconf.get('WEB','LOCAL') == 'yes'
+	class NeoHTTPHandler(http.server.BaseHTTPRequestHandler):
+		def do_GET(self):
+			log_request(self)
 
-		if request_response.status_code == 404:
-			self.send_error(404, "404 Not Found")
-			return
-		elif request_response.status_code == 301:
-			request_location = request_response.headers.get('location') or request_response.headers.get('Location')
-			self.send_response(301)
-			self.send_header('Location', "http://%s%s" % (host_name or "ucanet.net", urllib.parse.urlparse(request_location).path))
-			self.end_headers()
-			return
-		elif request_response.status_code == 302:
-			request_location = request_response.headers.get('location') or request_response.headers.get('Location')
-			self.send_response(302)
-			self.send_header('Location', request_location)
-			self.end_headers()
-			return
-		else:
-			self.send_response_only(200)
+			host_name = self.headers.get('Host')
+			neo_site = find_entry(host_name)
 
-		for current_header, current_value in request_response.headers.items():
-			if current_header.lower() == "content-type":
-				self.send_header(current_header, current_value)
+			if neo_site and not format_ip(neo_site):
+				neo_site = "https://%s.neocities.org%s" % (neo_site, self.path)
 			else:
-				continue
+				neo_site = "https://ucanet.net%s" % (self.path)
 
-		self.end_headers()
-		self.wfile.write(request_response.content)	
-    
+			request_response = requests.get(neo_site, stream = True, allow_redirects=False)
+
+			if request_response.status_code == 404:
+				self.send_error(404, "404 Not Found")
+				return
+			elif request_response.status_code == 301:
+				request_location = request_response.headers.get('location') or request_response.headers.get('Location')
+				self.send_response(301)
+				self.send_header('Location', "http://%s%s" % (host_name or "ucanet.net", urllib.parse.urlparse(request_location).path))
+				self.end_headers()
+				return
+			elif request_response.status_code == 302:
+				request_location = request_response.headers.get('location') or request_response.headers.get('Location')
+				self.send_response(302)
+				self.send_header('Location', request_location)
+				self.end_headers()
+				return
+			else:
+				self.send_response_only(200)
+
+			for current_header, current_value in request_response.headers.items():
+				if current_header.lower() == "content-type":
+					self.send_header(current_header, current_value)
+				else:
+					continue
+
+			self.end_headers()
+			self.wfile.write(request_response.content)
+
 def server_init():
 	server_list = []
 	server_list.append(socketserver.ThreadingUDPServer((SERVER_IP, SERVER_PORT), UDPRequestHandler))
 	server_list.append(socketserver.ThreadingTCPServer((SERVER_IP, SERVER_PORT), TCPRequestHandler))
 	if ucaconf.get('WEB','LOCAL') == 'yes':
 		server_list.append(http.server.ThreadingHTTPServer((NEOCITIES_IP, NEOCITIES_PORT), NeoHTTPHandler))
-    
+
 	for current_server in server_list:
 		server_thread = threading.Thread(target = current_server.serve_forever)
 		server_thread.daemon = True
