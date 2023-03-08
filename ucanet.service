@@ -5,7 +5,6 @@ After=multi-user.target
 [Service]
 Type=simple
 Restart=always
-User=ucanet
 WorkingDirectory=/home/ucanet/ucanet-registry
 ExecStart=/usr/bin/python3 /home/ucanet/ucanet-server.py
 PIDFile=/var/run/ucanet.pid
