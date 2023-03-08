@@ -24,7 +24,9 @@ if ucaconf.get('WEB','LOCAL') == 'yes':
 
 SERVER_IP = ucaconf.get('DNS', 'LISTEN')
 SERVER_PORT = int(ucaconf.get('DNS', 'PORT'))
+SERVER_LOGGING = ucaconf.get('DNS','LOGGING')
 NEOCITIES_IP = ucaconf.get('WEB', 'HOST')
+NEOCITIES_LOG = ucaconf.get('WEB','LOGGING')
 
 def log_request(handler_object):
 	current_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
@@ -51,7 +53,7 @@ class BaseRequestHandler(socketserver.BaseRequestHandler):
 		raise NotImplementedError
 
 	def handle(self):
-		log_request(self)
+		if SERVER_LOGGING == 'yes': log_request(self)
 
 		try:
 			self.send_data(dns_response(self.get_data()))
@@ -82,7 +84,7 @@ class UDPRequestHandler(BaseRequestHandler):
 if ucaconf.get('WEB','LOCAL') == 'yes'
 	class NeoHTTPHandler(http.server.BaseHTTPRequestHandler):
 		def do_GET(self):
-			log_request(self)
+			if NEOCITIES_LOGGING == 'yes': log_request(self)
 
 			host_name = self.headers.get('Host')
 			neo_site = find_entry(host_name)
