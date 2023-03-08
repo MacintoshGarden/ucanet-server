@@ -17,8 +17,8 @@ from ucanetlib import *
 
 SERVER_IP = '127.0.0.1' # Change to your local IP Address.
 SERVER_PORT = 53
-NEOCITIES_IP = '127.0.0.1' # Change this to the IP that serves Neocities sites
-NEOCITIES_PORT = 80
+NEOCITIES_IP = '135.148.41.26' # Change this to the IP that serves Neocities sites
+#NEOCITIES_PORT = 80
 
 def log_request(handler_object):
 	current_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
@@ -118,7 +118,7 @@ def server_init():
 	server_list = []
 	server_list.append(socketserver.ThreadingUDPServer((SERVER_IP, SERVER_PORT), UDPRequestHandler))
 	server_list.append(socketserver.ThreadingTCPServer((SERVER_IP, SERVER_PORT), TCPRequestHandler))
-	server_list.append(http.server.ThreadingHTTPServer((NEOCITIES_IP, NEOCITIES_PORT), NeoHTTPHandler))
+	#server_list.append(http.server.ThreadingHTTPServer((NEOCITIES_IP, NEOCITIES_PORT), NeoHTTPHandler))
     
 	for current_server in server_list:
 		server_thread = threading.Thread(target = current_server.serve_forever)
