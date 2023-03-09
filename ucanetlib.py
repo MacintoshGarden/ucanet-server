@@ -13,8 +13,13 @@ CACHE_TTL = int(ucaconf.get('LIB_CACHE','TTL'))
 
 # Dirty old fix since we most likely won't be in the same thread at all when calling the db
 # This could probably be remedied if we moved this down to each method and removed the check
-con = sqlite3.connect("ucanet-registry.db", check_same_thread=False)
+#con = sqlite3.connect("ucanet-registry.db", check_same_thread=False)
+con = sqlite3.connect(":memory:", check_same_thread=False)
 cur = con.cursor()
+
+sql_file = open("ucanet-registry.sql")
+sql_as_string = sql_file.read()
+cur.executescript(sql_as_string)
 
 pending_changes = {}
 entry_cache = TTLCache(maxsize=CACHE_SIZE, ttl=CACHE_TTL)
