@@ -1,117 +1,26 @@
 import re
 import tldextract
 import time
-import git
 import os
 import configparser
 import sqlite3
-from apscheduler.schedulers.background import BackgroundScheduler
 from ipaddress import ip_address, IPv4Address
 from cachetools import TTLCache
 from threading import Lock
 
-REGISTRY_PATH = ucaconf.get('LIB_REGISTRY','PATH')
-GIT_USERNAME = ucaconf.get('LIB_GIT','USERNAME')
-GIT_PASSWORD = ucaconf.get('LIB_GIT','TOKEN')
-GIT_URL = ucaconf.get('LIB_GIT','URL')
-GIT_BRANCH = ucaconf.get('LIB_GIT','BRANCH')
-GIT_PATH = ucaconf.get('LIB_GIT','PATH')
 CACHE_SIZE = int(ucaconf.get('LIB_CACHE','SIZE'))
 CACHE_TTL = int(ucaconf.get('LIB_CACHE','TTL'))
+
+# Dirty old fix since we most likely won't be in the same thread at all when calling the db
+# This could probably be remedied if we moved this down to each method and removed the check
+con = sqlite3.connect("ucanet-registry.db", check_same_thread=False)
+cur = con.cursor()
 
 pending_changes = {}
 entry_cache = TTLCache(maxsize=CACHE_SIZE, ttl=CACHE_TTL)
 offline_extract = tldextract.TLDExtract(suffix_list_urls=())
-git_scheduler = BackgroundScheduler()
 entry_lock = Lock()
-file_lock = Lock()
 pending_lock = Lock()
-
-if not os.path.exists(GIT_PATH):
-	os.makedirs(GIT_PATH)
-
-def is_git_repo(path):
-	try:
-		_ = git.Repo(path).git_dir
-		return True
-	except git.exc.InvalidGitRepositoryError:
-		return False
-
-def start_git():
-	if is_git_repo(GIT_PATH):
-		repo = git.Repo.init(GIT_PATH, initial_branch=GIT_BRANCH)
-		return repo, repo.remote(name='origin')
-	else:
-		repo = git.Repo.init(GIT_PATH, initial_branch=GIT_BRANCH)
-		return repo, repo.create_remote('origin', GIT_URL)
-
-repo, origin = start_git()
-repo.git.add(all=True)
-
-def pull_git():
-	file_lock.acquire()
-	try:
-		origin.pull(GIT_BRANCH)
-	except:
-		pass
-	file_lock.release()
-
-def push_git():
-	pending_lock.acquire()
-	file_lock.acquire()
-	if len(pending_changes) > 0:
-		try:
-			formatted_changes = {}
-
-			for user_id, domain_list in pending_changes.items():
-				for current_name, current_ip in domain_list.items():
-					formatted_changes[current_name] = f'{current_name} {user_id} {current_ip}' + "\n"
-
-			with open(REGISTRY_PATH, 'r') as registry_file:
-				registry_lines = registry_file.readlines()
-
-			line_count = 0
-
-			for line in registry_lines:
-				split_lines = line.strip().split(' ')
-
-				if split_lines[0] in formatted_changes:
-					registry_lines[line_count] = formatted_changes[split_lines[0]]
-					del formatted_changes[split_lines[0]]
-
-				line_count += 1
-
-			for current_name, formatted_change in formatted_changes.items():
-				if len(registry_lines) > 0:
-					registry_lines[-1] = registry_lines[-1].replace("\n", "")
-					registry_lines[-1] = registry_lines[-1] + "\n"
-				registry_lines.append(formatted_change)
-
-			if len(registry_lines) > 0:
-				registry_lines[-1] = registry_lines[-1].replace("\n", "")
-
-			with open(REGISTRY_PATH, 'w') as registry_file:
-				registry_file.writelines(registry_lines)
-
-			pending_changes.clear()
-		except:
-			pass
-
-		try:
-			repo = git.Repo(GIT_PATH)
-			repo.git.add(all=True)
-			repo.index.commit("[automated] update registry")
-			repo.git.push('--set-upstream', repo.remote().name, GIT_BRANCH)
-		except:
-			pass
-
-	file_lock.release()
-	pending_lock.release()
-
-def schedule_git():
-	git_scheduler.add_job(id='git-pull-task', func=pull_git, trigger='interval', seconds=600)
-	git_scheduler.add_job(id='git-push-task', func=push_git, trigger='interval', seconds=15)
-	git_scheduler.start()
 
 def format_domain(domain_name):
 	domain_name = domain_name.lower()
@@ -170,19 +79,15 @@ def find_entry(domain_name):
 	entry_lock.release()
 
 	if domain_name:
-		file_lock.acquire()
-		registry_file = open(REGISTRY_PATH, 'r')
-		registry_lines = registry_file.readlines()
-		registry_file.close()
-		file_lock.release()
+		cur.execute('SELECT name, address FROM registry')
+		res = cur.fetchall()
 
-		for line in registry_lines:
-			split_lines = line.strip().split(' ')
-			if split_lines[0] == domain_name:
-				entry_lock.acquire()
-				entry_cache[domain_name] = split_lines[2]
-				entry_lock.release()
-				return split_lines[2]
+		for registry in res:
+				if registry[0] == domain_name:
+						entry_lock.acquire()
+						entry_cache[domain_name] = registry[1]
+						entry_lock.release()
+						return registry[1]
 
 		if entry := find_entry(second_level(domain_name)):
 			entry_lock.acquire()
@@ -195,16 +100,12 @@ def find_entry(domain_name):
 def user_domains(user_id):
 	domain_list = {}
 
-	file_lock.acquire()
-	registry_file = open(REGISTRY_PATH, 'r')
-	registry_lines = registry_file.readlines()
-	registry_file.close()
-	file_lock.release()
+	cur.execute('SELECT name, uid, address FROM registry WHERE uid=?',user_id)
+	res = cur.fetchall
 
-	for line in registry_lines:
-		split_lines = line.strip().split(' ')
-		if int(split_lines[1]) == user_id:
-			domain_list[split_lines[0]] = split_lines[2]
+	for line in res:
+			if int(line[1]) == user_id:
+					domain_list[line[0]] = line[2]
 
 	pending_lock.acquire()
 	if user_id in pending_changes.keys():
@@ -237,6 +138,3 @@ def register_ip(domain_name, user_id, current_ip):
 	pending_lock.release()
 	print(f'{domain_name} set ip to {current_ip} by {user_id}')
 	return True
-
-pull_git()
-schedule_git()

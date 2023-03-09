@@ -1,5 +1,5 @@
 # Installation Example
-In this example, the installation is made on a Linux server inside the home folder of the user ucanet.  
+In this example, the installation is made on a Linux server inside the home folder of the user ucanet - but running as root(!).  
 Make sure to set up the ucanet.ini properly, check further down for the default conf stuff.
 
 Living under the assumption that Python is already installed.
@@ -10,7 +10,10 @@ Living under the assumption that Python is already installed.
 2. Set a password that defies logic and reason  
 ```sudo passwd ucanet```
 
-3. Move the ucanet.service file  
+3a. Move the required files to your newly created home folder  
+```sudo mv ucanet-server.py ucanet.ini ucanetlib.py /home/ucanet/```
+
+3b. Move the ucanet.service file  
 ```sudo mv ucanet.service /etc/systemd/system/```
 
 4. Reload the service files!  
@@ -35,11 +38,13 @@ Who doesn't love configuration files? Anyways ...
 [DNS]
 PORT=53
 LISTEN=127.0.0.1
+LOGGING=no
 
 [WEB]
+LOCAL=no
 PORT=80
 HOST=135.148.41.26
-LOCAL=no
+LOGGING=no
 
 [LIB_REGISTRY]
 PATH=./ucanet-registry/ucanet-registry.txt
@@ -55,9 +60,15 @@ PATH=./ucanet-registry/
 TTL=600
 SIZE=3500
 ```
-Under DNS, we have the standard PORT set to 53 as well as the IP we want to LISTEN to, the LISTEN key should be set with *your* public facing IP.
+Under **DNS**, we have the standard PORT set to 53 as well as the IP we want to LISTEN to, the LISTEN key value should be set with *your* public facing IP.  
+Finally, we have logging (which is not done to file, but CLI) and can be set to yes or no. Set to no, you will get no feedback on new connections.
 
-Under WEB, there's a neocities handler, by default this is set to the official ucanet server IP.  
-You can however serve neocities content yourself by setting LOCAL to yes and changing the HOST to your public facing IP... the port is by default 80 for the sake of simplicity, this document does not yet deal with setting it up behind apache / nginx or whatever web server you might otherwise have running already though.
+Under **WEB**, there's a handler for both neocities and protoweb, by default this is set to the official ucanet server IP.  
+You can however serve neocities and protoweb content yourself by setting LOCAL to **yes** and changing the HOST to your public facing IP... the port is by default 80 for the sake of simplicity, this document does not yet deal with setting it up in front of / behind apache, nginx, caddy or whatever web server you might otherwise have running already.
 
-The last three can pretty much be left alone unless you're running the Discord bot as well.
+Finally, there is also a logging option here which can be toggled to yes or no, it behaves exactly like the one above.
+
+(*The last three keys can pretty much be left alone unless you're running the Discord bot as well.*)
+
+## Finally, finally
+This is file may need additional tweaks
