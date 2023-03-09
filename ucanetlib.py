@@ -4,6 +4,7 @@ import time
 import git
 import os
 import configparser
+import sqlite3
 from apscheduler.schedulers.background import BackgroundScheduler
 from ipaddress import ip_address, IPv4Address
 from cachetools import TTLCache
