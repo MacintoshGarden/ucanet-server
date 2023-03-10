@@ -4,28 +4,69 @@ import time
 import os
 import configparser
 import sqlite3
+import gzip
+import requests
 from ipaddress import ip_address, IPv4Address
 from cachetools import TTLCache
 from threading import Lock
 
-CACHE_SIZE = int(ucaconf.get('LIB_CACHE','SIZE'))
-CACHE_TTL = int(ucaconf.get('LIB_CACHE','TTL'))
+ucaconf = configparser.ConfigParser()
+ucaconf.read('ucanet.ini')
 
-# Dirty old fix since we most likely won't be in the same thread at all when calling the db
-# This could probably be remedied if we moved this down to each method and removed the check
-#con = sqlite3.connect("ucanet-registry.db", check_same_thread=False)
+DB_REVISION = int(ucaconf.get('DATABASE','revision'))
+CACHE_SIZE = int(ucaconf.get('LIB_CACHE','size'))
+CACHE_TTL = int(ucaconf.get('LIB_CACHE','ttl'))
+
+"""
+SQLite Create Begin
+Note: Since we won't be in the same thread when using the DB, we need to disable the check (durrty?)
+"""
 con = sqlite3.connect(":memory:", check_same_thread=False)
 cur = con.cursor()
-
-sql_file = open("ucanet-registry.sql")
-sql_as_string = sql_file.read()
-cur.executescript(sql_as_string)
+""" SQLite Create End """
 
 pending_changes = {}
 entry_cache = TTLCache(maxsize=CACHE_SIZE, ttl=CACHE_TTL)
 offline_extract = tldextract.TLDExtract(suffix_list_urls=())
 entry_lock = Lock()
 pending_lock = Lock()
+
+def db_revcheck():
+	revdata = requests.get(ucaconf.get('DATABASE','repo') + '/revision')
+	return revdata.text.strip()
+
+def db_cmp_dl():
+	local_rev = DB_REVISION
+	remote_rev = int(db_revcheck())
+
+	if remote_rev > local_rev:
+		print('Remote DB is much freshier smelling')
+		cur.execute('DROP INDEX registry_idx')
+		cur.execute('DROP TABLE registry')
+		cur.execute('DROP TABLE revision')
+		con.commit()
+
+		ucaconf.set('DATABASE', 'SQL', 'ucanet-registry-r%s.sql.gz'%str(remote_rev))
+		ucaconf.set('DATABASE', 'REVISION', str(remote_rev))
+
+		with open('ucanet.ini', 'w') as f:
+			ucaconf.write(f)
+
+		concat_file = ucaconf.get('DATABASE', 'path') + 'ucanet-registry-r%s.sql.gz'%str(remote_rev)
+		res = requests.get(ucaconf.get('DATABASE','repo') + 'ucanet-registry-r%s.sql.gz'%str(remote_rev), stream=True)
+
+		if res.status_code == 200:
+			with open(concat_file, 'wb') as fd:
+				for chunk in res.iter_content(chunk_size=None):
+					fd.write(chunk)
+		db_init()
+
+def db_init():
+	concat_sql = ucaconf.get('DATABASE', 'path') + ucaconf.get('DATABASE', 'sql')
+	with gzip.open(concat_sql, 'rt') as f:
+		sql_file = f.read()
+
+	cur.executescript(sql_file)
 
 def format_domain(domain_name):
 	domain_name = domain_name.lower()

@@ -23,11 +23,11 @@ if ucaconf.get('WEB','LOCAL') == 'yes':
 	import http.server
 	WEBSERVER_PORT = int(ucaconf.get('WEB', 'PORT'))
 
-SERVER_IP = ucaconf.get('DNS', 'LISTEN')
-SERVER_PORT = int(ucaconf.get('DNS', 'PORT'))
-SERVER_LOGGING = ucaconf.get('DNS','LOGGING')
-WEBSERVER_IP = ucaconf.get('WEB', 'HOST')
-WEBSERVER_LOG = ucaconf.get('WEB','LOGGING')
+SERVER_IP = ucaconf.get('DNS', 'listen')
+SERVER_PORT = int(ucaconf.get('DNS', 'port'))
+SERVER_LOGGING = ucaconf.get('DNS','logging')
+WEBSERVER_IP = ucaconf.get('WEB', 'host')
+WEBSERVER_LOG = ucaconf.get('WEB','logging')
 
 def log_request(handler_object):
 	current_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
@@ -90,10 +90,10 @@ if ucaconf.get('WEB','LOCAL') == 'yes':
 			host_name = self.headers.get('Host')
 			neo_site = find_entry(host_name)
 
-			if host_name and neo_site == "protoweb":	
-				proto_site = "http://%s%s" % (host_name, self.path)		
+			if host_name and neo_site == "protoweb":
+				proto_site = "http://%s%s" % (host_name, self.path)
 
-				request_response = requests.get(proto_site, stream = True, allow_redirects = False, headers = self.headers, proxies = {'http':'http://wayback.protoweb.org:7851', 'http':'http://wayback2.protoweb.org:7851'})		
+				request_response = requests.get(proto_site, stream = True, allow_redirects = False, headers = self.headers, proxies = {'http':'http://wayback.protoweb.org:7851', 'http':'http://wayback2.protoweb.org:7851'})
 				self.send_response_only(request_response.status_code)
 
 				for current_header, current_value in request_response.headers.items():
@@ -103,11 +103,11 @@ if ucaconf.get('WEB','LOCAL') == 'yes':
 				self.end_headers()
 				self.wfile.write(request_response.content)
 			else:
-				if neo_site and not format_ip(neo_site):	
+				if neo_site and not format_ip(neo_site):
 					neo_site = "https://%s.neocities.org%s" % (neo_site, self.path)
 				else:
 					neo_site = "https://ucanet.net%s" % (self.path)
-				
+
 				request_response = requests.get(neo_site, stream = True, allow_redirects=False)
 
 				if request_response.status_code == 404:
@@ -136,19 +136,19 @@ if ucaconf.get('WEB','LOCAL') == 'yes':
 
 				self.end_headers()
 				self.wfile.write(request_response.content)
-			
+
 			def do_POST(self):
 				if WEBSERVER_LOGGING == 'yes': log_request(self)
 
 				host_name = self.headers.get('Host')
 				neo_site = find_entry(host_name)
-			
-				if host_name and neo_site == "protoweb":	
-					proto_site = "http://%s%s" % (host_name, self.path)		
+
+				if host_name and neo_site == "protoweb":
+					proto_site = "http://%s%s" % (host_name, self.path)
 					content_len = int(self.headers.get('Content-Length', 0))
 					post_body = self.rfile.read(content_len)
-				
-					request_response = requests.post(proto_site, stream = True, allow_redirects = False, headers = self.headers, proxies = {'http':'http://wayback.protoweb.org:7851'}, data = post_body)		
+
+					request_response = requests.post(proto_site, stream = True, allow_redirects = False, headers = self.headers, proxies = {'http':'http://wayback.protoweb.org:7851'}, data = post_body)
 					self.send_response_only(request_response.status_code)
 
 					for current_header, current_value in request_response.headers.items():
@@ -161,6 +161,8 @@ if ucaconf.get('WEB','LOCAL') == 'yes':
 					self.send_error(403, "Forbidden")
 
 def server_init():
+	db_init()
+	db_cmp_dl()
 	server_list = []
 	server_list.append(socketserver.ThreadingUDPServer((SERVER_IP, SERVER_PORT), UDPRequestHandler))
 	server_list.append(socketserver.ThreadingTCPServer((SERVER_IP, SERVER_PORT), TCPRequestHandler))

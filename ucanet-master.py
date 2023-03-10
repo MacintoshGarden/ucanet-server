@@ -1,61 +1,66 @@
 """
-Just testing stuff
-
-gzip create from content:
-with gzip.open('/home/joe/file.sql.gz', 'wb') as f:
-    f.write(content)
-
-gzip read content from gzipped file:
-with gzip.open('/home/joe/file.sql.gz', 'rb') as f:
-    file_content = f.read()
+wip
 """
 import gzip
 import sqlite3
-from flask import Flask, g, send_file, request, jsonify
+import configparser
+from flask import Flask, send_file, request, jsonify
 
 app = Flask(__name__)
 
-def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(':memory:')
-    return db
-
-def init_db():
-    with app.app_context():
-        db = get_db()
-        with app.open_resource('./server-db/master.sql', mode='r') as f:
-            db.cursor().executescript(f.read())
-        db.commit()
-
-def query_db(query, args=(), one=False):
-    cur = get_db().execute(query, args)
-    rv = cur.fetchall()
-    cur.close()
-    return (rv[0] if rv else None) if one else rv
-
 @app.route('/')
 def index():
-    response_body = {
-        "hello": "world",
-        "world": "hello"
-    }
-    return jsonify(response_body), 200
+	response_body = {
+		"hello": "world",
+		"world": "hello"
+	}
+	return jsonify(response_body), 200
 
-@app.route("/version")
+def validate_apikey(api_key):
+	valid_key = "hardcorehardcode"
+	if valid_key == api_key:
+		return True
+
+@app.route("/test")
+def testapi():
+	key = request.headers.get('X-API-Key')
+	if validate_apikey(key):
+		print('Valid: %s'%key)
+		return '%s is a valid key, thanksyou'%key
+	else:
+		print('Invalid or no key supplied!')
+		return 'Invalid keEEEEEEyY!'
+
+@app.route("/sql/dump")
+def dumpcurrent():
+	data = ""
+	con = sqlite3.connect('ucanet-registry.db')
+
+	cursor.execute('SELECT rowid FROM revision')
+	rev = cursor.fetchone()
+
+	for line in con.iterdump():
+		data += '%s\n' % line
+
+	with gzip.open('archive/ucanet-registry-r%s.sql.gz'%str(data[0]), 'wt') as f:
+		f.write(data)
+
+	return('Work Complete!')
+
+@app.route("/revision")
 def getversion():
-    dbver = query_db('SELECT id FROM version', one=True)
-    if dbver is None:
-        print('Well, crap!')
-    else:
-        print(dbver['id'])
+	connect = sqlite3.connect('ucanet-registry.db')
+	cursor = connect.cursor()
+	cursor.execute('SELECT rowid FROM revision')
+
+	data = cursor.fetchone()
+	return str(data[0])
 
 @app.route("/database/<path:fname>")
 def download_file(fname):
     return send_from_directory(
-        './server-db/', fname, as_attachment=True
+        './archive/', fname, as_attachment=True
     )
 
 if __name__ == '__main__':
-    init_db()
     app.run(debug=True, host='127.0.0.1', port=8001)
