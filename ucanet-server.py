@@ -14,6 +14,7 @@ import socketserver
 import configparser
 from dnslib import *
 from ucanetlib import *
+from ucanetgit import *
 
 ucaconf = configparser.ConfigParser()
 ucaconf.read('ucanet.ini')
@@ -92,7 +93,7 @@ if ucaconf.get('WEB','LOCAL') == 'yes':
 			if host_name and neo_site == "protoweb":	
 				proto_site = "http://%s%s" % (host_name, self.path)		
 
-				request_response = requests.get(proto_site, stream = True, allow_redirects = False, headers = self.headers, proxies = {'http':'http://wayback.protoweb.org:7851'})		
+				request_response = requests.get(proto_site, stream = True, allow_redirects = False, headers = self.headers, proxies = {'http':'http://wayback.protoweb.org:7851', 'http':'http://wayback2.protoweb.org:7851'})		
 				self.send_response_only(request_response.status_code)
 
 				for current_header, current_value in request_response.headers.items():
